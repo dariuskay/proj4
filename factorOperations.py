@@ -102,17 +102,17 @@ def joinFactors(factors):
 
     "*** YOUR CODE HERE ***"
 
-    setUnconditioned = set()
-    setConditioned = set()
+    unconditioned = set()
+    conditioned = set()
     domainDict = dict()
 
     for factor in factors:
-        setConditioned = setConditioned | factor.conditionedVariables()
-        setUnconditioned = setUnconditioned | factor.unconditionedVariables()
+        conditioned = conditioned | factor.conditionedVariables()
+        unconditioned = unconditioned | factor.unconditionedVariables()
         domainDict = dict(domainDict, **factor.variableDomainsDict())
 
-    setConditioned = setConditioned - (setConditioned & setUnconditioned)
-    returnFactor = Factor(setUnconditioned, setConditioned, domainDict)
+    conditioned = conditioned - (conditioned & unconditioned)
+    returnFactor = Factor(unconditioned, conditioned, domainDict)
 
     for assignmentDict in returnFactor.getAllPossibleAssignmentDicts():
         probability = 1
@@ -248,14 +248,25 @@ def normalize(factor):
     "*** YOUR CODE HERE ***"
 
     probabilitySum = 0
+
     for row in factor.getAllPossibleAssignmentDicts():
         probabilitySum += factor.getProbability(row)
 
+    unconditioned = set()
+    conditioned = set()
+
+    for variable in factor.conditionedVariables():
+        if len(variableDomainsDict[variable]) > 1:
+            unconditioned.add(variable)
+        else:
+            conditioned.add(variable)
     for variable in factor.unconditionedVariables():
-        if (len(variableDomainsDict[variable]) == 1):
-            factor.conditionedVariables().add(variable)
-            factor.unconditionedVariables().remove(variable)
-    returnFactor = Factor(factor.unconditionedVariables(), factor.conditionedVariables(), factor.variableDomainsDict())
+        if len(variableDomainsDict[variable]) > 1:
+            unconditioned.add(variable)
+        else:
+            conditioned.add(variable)
+
+    returnFactor = Factor(unconditioned, conditioned, variableDomainsDict)
 
     for assignmentDict in returnFactor.getAllPossibleAssignmentDicts():
         probability = factor.getProbability(assignmentDict)
