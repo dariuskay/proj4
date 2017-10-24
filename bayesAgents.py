@@ -102,15 +102,19 @@ def constructBayesNet(gameState):
              (X_POS_VAR, GHOST_HOUSE_VAR),
              (Y_POS_VAR, GHOST_HOUSE_VAR)]
 
+    # want to append walls as obsVars to obsVars
     for house in gameState.getPossibleHouses():
         for walls in gameState.getHouseWalls(house):
             obsVars.append(OBS_VAR_TEMPLATE % walls)
 
+    # our edges array needs to include all edges from
+    # obsVars to foodHouse and ghostHouse
     for obsVar in obsVars:
         edges.append((FOOD_HOUSE_VAR, obsVar))
         edges.append((GHOST_HOUSE_VAR, obsVar))
         variableDomainsDict[obsVar] = OBS_VALS
 
+    # finish variableDomainsDict assignments
     variableDomainsDict[X_POS_VAR] = X_POS_VALS
     variableDomainsDict[Y_POS_VAR] = Y_POS_VALS
     variableDomainsDict[FOOD_HOUSE_VAR] = HOUSE_VALS
@@ -148,7 +152,10 @@ def fillYCPT(bayesNet, gameState):
     yFactor = bn.Factor([Y_POS_VAR], [], bayesNet.variableDomainsDict())
     "*** YOUR CODE HERE ***"
     # util.raiseNotDefined()
-
+    yFactor.setProbability({Y_POS_VAR: LEFT_TOP_VAL}, PROB_ONLY_LEFT_TOP)
+    yFactor.setProbability({Y_POS_VAR: LEFT_BOTTOM_VAL}, PROB_ONLY_LEFT_BOTTOM)
+    yFactor.setProbability({Y_POS_VAR: BOTH_TOP_VAL}, PROB_BOTH_TOP)
+    yFactor.setProbability({Y_POS_VAR: BOTH_BOTTOM_VAL}, PROB_BOTH_BOTTOM)
 
     bayesNet.setCPT(Y_POS_VAR, yFactor)
 
@@ -214,7 +221,73 @@ def fillObsCPT(bayesNet, gameState):
     bottomLeftPos, topLeftPos, bottomRightPos, topRightPos = gameState.getPossibleHouses()
 
     "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
+    def obsVarFactorize(var):
+        return bn.Factor([var], [FOOD_HOUSE_VAR, GHOST_HOUSE_VAR], bayesNet.variableDomainsDict())
+
+    def getNeighborQuadrant(gameState, obsPos):
+        possibleHouses = gameState.getPossibleHouses()
+        adjacentHouse = possibleHouses[0]
+        minimumDistance = util.manhattanDistance(obsPos, adjacentHouse)
+        for house in possibleHouses[1:]:
+
+            thisDistance = util.manhattanDistance(obsPos, house)
+            if thisDistance < minimumDistance:
+                minimumDistance = thisDistance
+                adjacentHouse = house
+
+        bottomLeftPos = possibleHouses[0]
+        topLeftPos = possibleHouses[1]
+        bottomRightPos = possibleHouses[2]
+        topRightPos = possibleHouses[3]
+
+        if adjacentHouse == bottomLeftPos:
+            return BOTTOM_LEFT_VAL
+        elif adjacentHouse == topLeftPos:
+            return TOP_LEFT_VAL
+        elif adjacentHouse == bottomRightPos:
+            return BOTTOM_RIGHT_VAL
+        else:
+            return TOP_RIGHT_VAL
+
+    # Alright now our helper methods are done. Let's get going with the CPT!
+
+    houses = gameState.getPossibleHouses()
+
+    for house in houses:
+
+        for obsPos in gameState.getHouseWalls(house):
+
+            obsVar = OBS_VAR_TEMPLATE % obsPos
+            obsVarFactor = obsVarFactorize(obsVar)
+            cpt = obsVarFactor.getAllPossibleAssignmentDicts()
+            for row in cpt:
+
+                ghostHouse = row[GHOST_HOUSE_VAR]
+                foodHouse = row[FOOD_HOUSE_VAR]
+                color = row[obsVar]
+                quadrant = getNeighborQuadrant(gameState, obsPos)
+                probability = 0.0
+
+                if (quadrant != ghostHouse) and (quadrant != foodHouse):
+                    if (color == NO_OBS_VAL):
+                        probability = 1.0
+                elif (quadrant == foodHouse) or (ghostHouse == foodHouse):
+                    if color == RED_OBS_VAL:
+                        probability = PROB_FOOD_RED
+                    elif color == BLUE_OBS_VAL:
+                        probability = 1 - PROB_FOOD_RED
+                elif (quadrant == ghostHouse):
+                    if color == RED_OBS_VAL:
+                        probability = PROB_GHOST_RED
+                    elif color == BLUE_OBS_VAL:
+                        probability = 1 - PROB_GHOST_RED
+
+                obsVarFactor.setProbability(row, probability)
+            bayesNet.setCPT(obsVar, obsVarFactor)
+
+
+
+    # util.raiseNotDefined()
 
 def getMostLikelyFoodHousePosition(evidence, bayesNet, eliminationOrder):
     """
@@ -229,7 +302,22 @@ def getMostLikelyFoodHousePosition(evidence, bayesNet, eliminationOrder):
     (This should be a very short method.)
     """
     "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
+
+    # Uh..huh.. I think this should be correct
+
+    factor = inference.inferenceByVariableElimination(bayesNet, ['foodHouse', 'ghostHouse'], evidence, eliminationOrder)
+    maximumProbability = float('-inf')
+    possibleAssignmentDicts = factor.getAllPossibleAssignmentDicts()
+    maximumAssignmentDict = possibleAssignmentDicts[0]
+
+    for assignmentDict in possibleAssignmentDicts[1:]:
+        thisProbability = factor.getProbability(assignmentDict)
+        if (thisProbability > maximumProbability):
+            maximumAssignmentDict = assignmentDict
+            maximumProbability = thisProbability
+    return maximumAssignmentDict
+
+    # util.raiseNotDefined()
 
 
 class BayesAgent(game.Agent):
